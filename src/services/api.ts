@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+// Determine the API URL based on the environment
+const isProduction = import.meta.env.PROD;
+const API_URL = isProduction ? '/api' : 'http://localhost:3001/api';
 
 // Create axios instance
 const api = axios.create({

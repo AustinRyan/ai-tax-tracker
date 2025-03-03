@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "deploy": "node deploy.js",
+    "deploy": "vercel",
     "start": "node server/index.js",
     "build:prod": "vite build --mode production"
   },

@@ -27,7 +27,6 @@ dist-ssr
 deploy.js
 deployment-guide.md
 .env.production
-vercel.json
 render.yaml
 docker-compose.yml
 Dockerfile
