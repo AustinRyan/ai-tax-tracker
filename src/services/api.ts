@@ -2,7 +2,12 @@ import axios from 'axios';
 
 // Determine the API URL based on the environment
 const isProduction = import.meta.env.PROD;
-const API_URL = isProduction ? '/api' : 'http://localhost:3001/api';
+// In production, use the environment variable or a default backend URL
+const API_URL = isProduction 
+  ? (import.meta.env.VITE_BACKEND_URL || 'https://taxai-backend.onrender.com/api') 
+  : 'http://localhost:3001/api';
+
+console.log('Using API URL:', API_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -10,7 +15,27 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout for long-running operations
 });
+
+// Add request interceptor for debugging in development
+if (!isProduction) {
+  api.interceptors.request.use(request => {
+    console.log('API Request:', request.method, request.url);
+    return request;
+  });
+  
+  api.interceptors.response.use(
+    response => {
+      console.log('API Response:', response.status, response.config.url);
+      return response;
+    },
+    error => {
+      console.error('API Error:', error.response?.status || error.message, error.config?.url);
+      return Promise.reject(error);
+    }
+  );
+}
 
 // Receipt processing service
 export const receiptService = {

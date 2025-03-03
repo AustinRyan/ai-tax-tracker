@@ -2,9 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 import OpenAI from 'openai';
 import Tesseract from 'tesseract.js';
 import sharp from 'sharp';
@@ -13,49 +10,24 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 // Initialize environment variables
 dotenv.config();
 
-// Initialize Express app
-const app = express();
-
-// Set up __dirname equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads with memory storage for serverless
-const storage = multer.memoryStorage();
-
-const fileFilter = (req, file, cb) => {
-  // Accept images and PDFs
-  if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image and PDF files are allowed!'), false);
-  }
-};
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: fileFilter
-});
-
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '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',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Middleware
-app.use(cors({
-  origin: '*', // Allow all origins for development
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.json());
+// Configure multer for file uploads with memory storage for serverless
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    // Accept images and PDFs
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and PDF files are allowed!'), false);
+    }
+  }
+});
 
 // Helper function to extract text from images using Tesseract
 async function extractTextFromImage(buffer) {
@@ -117,10 +89,8 @@ function safeSerialize(obj) {
   }
 }
 
-// Routes
-
-// Process receipt and extract information
-app.post('/api/receipts/process', upload.single('receipt'), async (req, res) => {
+// Create a handler for the receipts/process endpoint
+async function processReceiptHandler(req, res) {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -225,15 +195,15 @@ app.post('/api/receipts/process', upload.single('receipt'), async (req, res) => 
     const safeResponse = safeSerialize(aiResponse);
     
     // Return the processed data
-    res.json(safeResponse);
+    return res.status(200).json(safeResponse);
   } catch (error) {
     console.error('Error processing receipt:', error);
-    res.status(500).json({ error: 'Failed to process receipt', details: error.message });
+    return res.status(500).json({ error: 'Failed to process receipt', details: error.message });
   }
-});
+}
 
-// Categorize a transaction
-app.post('/api/transactions/categorize', async (req, res) => {
+// Create a handler for the transactions/categorize endpoint
+async function categorizeTransactionHandler(req, res) {
   try {
     const { description, amount, date, vendor } = req.body;
     
@@ -295,15 +265,15 @@ app.post('/api/transactions/categorize', async (req, res) => {
     }
     
     // Return the categorization
-    res.json(aiResponse);
+    return res.status(200).json(aiResponse);
   } catch (error) {
     console.error('Error categorizing transaction:', error);
-    res.status(500).json({ error: 'Failed to categorize transaction', details: error.message });
+    return res.status(500).json({ error: 'Failed to categorize transaction', details: error.message });
   }
-});
+}
 
-// AI Chat endpoint
-app.post('/api/chat', async (req, res) => {
+// Create a handler for the chat endpoint
+async function chatHandler(req, res) {
   try {
     const { message, userId, chatHistory } = req.body;
     
@@ -343,31 +313,69 @@ app.post('/api/chat', async (req, res) => {
     console.log('Received response from OpenAI');
     
     // Return the chat response
-    res.json({
+    return res.status(200).json({
       message: aiResponse,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error processing chat message:', error);
-    res.status(500).json({ error: 'Failed to process chat message', details: error.message });
+    return res.status(500).json({ error: 'Failed to process chat message', details: error.message });
   }
-});
+}
 
-// Export the Express API as a serverless function
+// Export the serverless function handler
 export default async function handler(req, res) {
-  // Don't process the request if it's an OPTIONS request
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
-  
-  // Forward the request to the Express app
-  return new Promise((resolve, reject) => {
-    app(req, res, (err) => {
-      if (err) {
-        return reject(err);
-      }
-      resolve();
+
+  // Parse the URL path
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const path = url.pathname;
+
+  // Route the request based on the path
+  if (path === '/api/receipts/process' && req.method === 'POST') {
+    // Handle file upload
+    return new Promise((resolve, reject) => {
+      upload.single('receipt')(req, res, (err) => {
+        if (err) {
+          console.error('Multer error:', err);
+          res.status(400).json({ error: err.message });
+          return resolve();
+        }
+        
+        // Process the receipt
+        processReceiptHandler(req, res)
+          .then(resolve)
+          .catch(reject);
+      });
     });
-  });
+  } else if (path === '/api/transactions/categorize' && req.method === 'POST') {
+    // Parse JSON body if not already parsed
+    if (typeof req.body === 'string') {
+      req.body = JSON.parse(req.body);
+    }
+    
+    return categorizeTransactionHandler(req, res);
+  } else if (path === '/api/chat' && req.method === 'POST') {
+    // Parse JSON body if not already parsed
+    if (typeof req.body === 'string') {
+      req.body = JSON.parse(req.body);
+    }
+    
+    return chatHandler(req, res);
+  } else {
+    // Handle 404
+    return res.status(404).json({ error: 'Not found' });
+  }
 }

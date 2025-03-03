@@ -2,7 +2,10 @@ import axios from 'axios';
 
 // Determine the API URL based on the environment
 const isProduction = import.meta.env.PROD;
-const API_URL = isProduction ? '/api' : 'http://localhost:3001/api';
+// In production, use the environment variable or a default backend URL
+const API_URL = isProduction 
+  ? (import.meta.env.VITE_BACKEND_URL || 'https://your-backend-url.com/api') 
+  : 'http://localhost:3001/api';
 
 // Receipt processing service
 export const receiptsService = {
@@ -67,7 +70,7 @@ export const receiptsService = {
       
       // For network errors
       if (error.message.includes('Network Error')) {
-        throw new Error('Network error. Please check your connection to the server. This may be due to file size limitations in serverless functions.');
+        throw new Error('Network error. Please check your connection to the server.');
       }
       
       throw new Error(error.message || 'Failed to process receipt');

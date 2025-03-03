@@ -10,9 +10,13 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "deploy": "vercel",
+    "deploy:frontend": "vercel",
+    "deploy:backend": "node deploy-backend.js",
     "start": "node server/index.js",
-    "build:prod": "vite build --mode production"
+    "build:prod": "vite build --mode production",
+    "server:dev": "nodemon server/index.js",
+    "prepare:backend": "node deploy-backend.js",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
