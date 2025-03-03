@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// API URL
-const API_URL = 'http://localhost:3001/api';
+// Determine the API URL based on the environment
+const isProduction = import.meta.env.PROD;
+const API_URL = isProduction ? '/api' : 'http://localhost:3001/api';
 
 // Receipt processing service
 export const receiptsService = {
@@ -18,7 +19,7 @@ export const receiptsService = {
           'Content-Type': 'multipart/form-data'
         },
         // Add timeout to prevent hanging requests
-        timeout: 60000 // 60 seconds timeout
+        timeout: 120000 // 120 seconds timeout for larger files
       });
       
       console.log('Receipt processed successfully:', response.data);
@@ -66,7 +67,7 @@ export const receiptsService = {
       
       // For network errors
       if (error.message.includes('Network Error')) {
-        throw new Error('Network error. Please check your connection to the server.');
+        throw new Error('Network error. Please check your connection to the server. This may be due to file size limitations in serverless functions.');
       }
       
       throw new Error(error.message || 'Failed to process receipt');
