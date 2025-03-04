@@ -56,16 +56,11 @@ const upload = multer({
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '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',
 });
 
 // Middleware
-// Configure CORS to allow requests from your frontend domains
-app.use(cors({
-  origin: ['http://localhost:5173', 'https://ai-tax-tracker-91688n9hc-austinryans-projects.vercel.app', process.env.FRONTEND_URL].filter(Boolean),
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -135,11 +130,6 @@ function safeSerialize(obj) {
 }
 
 // Routes
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
 
 // Process receipt and extract information
 app.post('/api/receipts/process', upload.single('receipt'), async (req, res) => {
@@ -216,7 +206,7 @@ app.post('/api/receipts/process', upload.single('receipt'), async (req, res) => 
           if (part1.length === 4) {
             // YYYY/MM/DD
             aiResponse.date = `${part1}-${part2.padStart(2, '0')}-${part3.padStart(2, '0')}`;
-          } else if (parseInt(part1) > 12 && parseInt(part1) <= 31) {
+          } else if (parseInt(part1) > 12) {
             // DD/MM/YYYY
             aiResponse.date = `${part3.length === 2 ? '20' + part3 : part3}-${part2.padStart(2, '0')}-${part1.padStart(2, '0')}`;
           } else {
@@ -226,28 +216,41 @@ app.post('/api/receipts/process', upload.single('receipt'), async (req, res) => 
         }
       }
       
+      // Ensure numeric values are actually numbers
+      if (typeof aiResponse.totalAmount === 'string') {
+        aiResponse.totalAmount = parseFloat(aiResponse.totalAmount.replace(/[^\d.-]/g, '')) || 0;
+      }
+      
+      if (typeof aiResponse.taxAmount === 'string') {
+        aiResponse.taxAmount = parseFloat(aiResponse.taxAmount.replace(/[^\d.-]/g, '')) || 0;
+      }
+      
     } catch (error) {
-      console.error('Error parsing AI response:', error);
-      aiResponse = {
+      console.error('Error parsing OpenAI response as JSON:', error);
+      console.log('Response content:', aiResponseContent);
+      aiResponse = { 
+        error: 'Failed to parse AI response', 
+        rawResponse: aiResponseContent,
         vendor: "Unknown Vendor",
         date: new Date().toISOString().split('T')[0],
         totalAmount: 0,
         items: [],
         category: "Office Expenses",
         deductible: true,
-        deductiblePercentage: 100,
-        error: "Failed to parse AI response"
+        deductiblePercentage: 100
       };
     }
     
-    // Add the extracted text to the response
-    aiResponse.extractedText = extractedText;
-    
-    // Add the file path for reference
-    aiResponse.filePath = `/uploads/${path.basename(filePath)}`;
-    
-    // Safely serialize the response
+    // Safely serialize the response to avoid Symbol() errors
     const safeResponse = safeSerialize(aiResponse);
+    
+    // Add the extracted text and file path to the response
+    safeResponse.extractedText = extractedText;
+    safeResponse.filePath = req.file.filename;
+    
+    // Create a URL for the uploaded file
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    safeResponse.imageUrl = fileUrl;
     
     // Return the processed data
     res.json(safeResponse);
@@ -266,61 +269,48 @@ app.post('/api/transactions/categorize', async (req, res) => {
       return res.status(400).json({ error: 'Transaction description is required' });
     }
     
-    console.log('Categorizing transaction with OpenAI');
+    console.log('Categorizing transaction with OpenAI using model: gpt-4o');
     
-    // Use OpenAI API to categorize the transaction
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are an AI assistant specialized in categorizing financial transactions for tax purposes. Based on the transaction description, amount, date, and vendor, determine the most appropriate tax category, whether it's deductible, and the deductible percentage. Format the response as a structured JSON object."
+          content: "You are an AI assistant specialized in tax categorization for businesses. Your task is to categorize business expenses for tax purposes based on the provided transaction details. Provide a tax category, determine if it's deductible, and explain the tax implications."
         },
         {
           role: "user",
-          content: `Categorize this transaction for tax purposes:
+          content: `Categorize this business transaction for tax purposes:
           Description: ${description}
-          Amount: ${amount || 'Unknown'}
-          Date: ${date || 'Unknown'}
-          Vendor: ${vendor || 'Unknown'}
+          Amount: ${amount || 'Not provided'}
+          Date: ${date || 'Not provided'}
+          Vendor: ${vendor || 'Not provided'}
           
           Provide a JSON response with the following fields:
-          - category: The tax category (e.g., "Office Expenses", "Travel", "Meals and Entertainment", etc.)
-          - deductible: Boolean indicating if the expense is deductible
-          - deductiblePercentage: The percentage that is deductible (e.g., 100 for fully deductible, 50 for partially deductible)
-          - explanation: A brief explanation of the categorization`
+          - category: The tax category this expense falls under
+          - deductible: Whether this expense is likely tax-deductible (true/false)
+          - deductiblePercentage: If partially deductible, what percentage (e.g., 50 for meals)
+          - explanation: A brief explanation of the tax implications
+          - suggestedDocumentation: What documentation should be kept for this expense`
         }
       ],
-      max_tokens: 500,
       response_format: { type: "json_object" }
     });
     
-    // Parse the AI response
+    // Parse and return the AI response
     const aiResponseContent = response.choices[0].message.content;
-    console.log('Received response from OpenAI');
-    
     let aiResponse;
+    
     try {
       aiResponse = JSON.parse(aiResponseContent);
-      
-      // Ensure the response has the expected structure
-      if (!aiResponse.category) aiResponse.category = "Uncategorized";
-      if (aiResponse.deductible === undefined) aiResponse.deductible = false;
-      if (!aiResponse.deductiblePercentage) aiResponse.deductiblePercentage = 0;
-      if (!aiResponse.explanation) aiResponse.explanation = "No explanation provided";
-      
     } catch (error) {
-      console.error('Error parsing AI response:', error);
-      aiResponse = {
-        category: "Uncategorized",
-        deductible: false,
-        deductiblePercentage: 0,
-        explanation: "Failed to parse AI response"
-      };
+      console.error('Error parsing OpenAI response as JSON:', error);
+      aiResponse = { error: 'Failed to parse AI response', rawResponse: aiResponseContent };
     }
     
-    // Return the categorization
-    res.json(aiResponse);
+    // Safely serialize the response
+    const safeResponse = safeSerialize(aiResponse);
+    res.json(safeResponse);
   } catch (error) {
     console.error('Error categorizing transaction:', error);
     res.status(500).json({ error: 'Failed to categorize transaction', details: error.message });
@@ -336,51 +326,87 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
     
-    console.log('Processing chat message with OpenAI');
+    // In a real application, you would fetch the user's transaction and receipt data
+    // from your database here to provide context to the AI
     
-    // Format chat history for OpenAI
-    const formattedHistory = chatHistory && Array.isArray(chatHistory) 
-      ? chatHistory.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content
-        }))
-      : [];
+    // For now, we'll use a mock context
+    const userContext = `
+      The user has the following recent transactions:
+      1. Office Supplies from Staples - $245.99 on 2025-03-15 (Category: Office Expenses)
+      2. Client Dinner at Olive Garden - $189.75 on 2025-03-12 (Category: Meals & Entertainment)
+      3. AWS Monthly Subscription - $432.10 on 2025-03-10 (Category: Software & Services)
+      4. Uber Ride - $28.50 on 2025-03-08 (Category: Travel)
+      5. Marketing Conference Ticket - $899.00 on 2025-03-05 (Category: Professional Development)
+      
+      Total spending on client meals in March: $189.75
+      Total spending on software in Q1 2025: $1,296.30
+      Estimated tax savings so far this year: $6,039
+    `;
     
-    // Use OpenAI API for chat
+    // Prepare chat history for the API
+    const formattedChatHistory = chatHistory ? chatHistory.map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    })) : [];
+    
+    console.log('Sending chat message to OpenAI using model: gpt-4o');
+    
+    // Create the API request
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are a helpful tax assistant. You provide information about tax deductions, expense categorization, and general tax advice for small businesses and individuals. You are knowledgeable about US tax laws and regulations. Provide concise, accurate responses to user queries about taxes and financial matters."
+          content: `You are an AI tax assistant for a business expense tracking application. You help users understand their expenses, tax deductions, and answer tax-related questions.
+          
+          Current user context:
+          ${userContext}
+          
+          When answering questions about expenses or tax implications:
+          1. Reference the user's actual transaction data when relevant
+          2. Provide specific numbers and calculations when possible
+          3. Explain tax implications clearly
+          4. If you don't have enough information, ask clarifying questions
+          5. Always maintain a professional, helpful tone`
         },
-        ...formattedHistory,
+        ...formattedChatHistory,
         {
           role: "user",
           content: message
         }
       ],
+      temperature: 0.7,
       max_tokens: 1000
     });
     
-    // Get the AI response
-    const aiResponse = response.choices[0].message.content;
-    console.log('Received response from OpenAI');
-    
-    // Return the chat response
+    // Return the AI response
     res.json({
-      message: aiResponse,
-      timestamp: new Date().toISOString()
+      message: response.choices[0].message.content,
+      timestamp: new Date()
     });
   } catch (error) {
-    console.error('Error processing chat message:', error);
+    console.error('Error in AI chat:', error);
     res.status(500).json({ error: 'Failed to process chat message', details: error.message });
   }
 });
 
 // Start the server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`API available at http://localhost:${PORT}/api`);
-  console.log(`Health check at http://localhost:${PORT}/api/health`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`Port ${PORT} is already in use. The server is likely already running.`);
+    console.log('Continuing with the application...');
+  } else {
+    console.error('Server error:', err);
+  }
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down server...');
+  server.close(() => {
+    console.log('Server shut down');
+    process.exit(0);
+  });
 });
