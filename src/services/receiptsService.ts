@@ -4,8 +4,8 @@ import axios from 'axios';
 const isProduction = import.meta.env.PROD;
 // In production, use the environment variable or a default backend URL
 const API_URL = isProduction 
-  ? 'https://ai-tax-tracker.onrender.com' 
-  : 'http://localhost:3001';
+  ? 'https://ai-tax-tracker.onrender.com/api' 
+  : 'http://localhost:3001/api';
 
 // Receipt processing service
 export const receiptsService = {
