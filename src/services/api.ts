@@ -4,8 +4,8 @@ import axios from 'axios';
 const isProduction = import.meta.env.PROD;
 // In production, use the environment variable or a default backend URL
 const API_URL = isProduction 
-  ? (import.meta.env.VITE_BACKEND_URL || 'https://taxai-backend.onrender.com/api') 
-  : 'http://localhost:3001/api';
+  ? 'https://ai-tax-tracker.onrender.com'
+  : 'http://localhost:3001';
 
 console.log('Using API URL:', API_URL);
 

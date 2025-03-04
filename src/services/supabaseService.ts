@@ -290,7 +290,7 @@ export const receiptsService = {
       
       console.log('Uploading receipt for processing via API...');
       
-      const response = await axios.post('http://localhost:3001/api/receipts/process', formData, {
+      const response = await axios.post('https://ai-tax-tracker.onrender.com/api/receipts/process', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
