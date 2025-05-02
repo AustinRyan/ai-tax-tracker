@@ -10,16 +10,21 @@ import Tesseract from 'tesseract.js';
 import sharp from 'sharp';
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
-// Initialize environment variables
-dotenv.config();
+// Set up __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize environment variables - find the .env file in the project root
+const rootDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.resolve(rootDir, '.env') });
+
+// Log environment variables for debugging (remove in production)
+console.log('Environment variables loaded from:', path.resolve(rootDir, '.env'));
+console.log('OpenAI API Key exists:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Set up __dirname equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -55,8 +60,40 @@ const upload = multer({
 });
 
 // Initialize OpenAI client
+let OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// Check if we're in development mode and API key is missing
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const isLocalhost = PORT === 3001;
+
+// Handle different environments
+if (!OPENAI_API_KEY && (isDevelopment || isLocalhost)) {
+  // For local development only - read directly from .env file as fallback
+  try {
+    console.log('Attempting to read API key directly from .env file...');
+    const envContent = fs.readFileSync(path.resolve(rootDir, '.env'), 'utf8');
+    const apiKeyMatch = envContent.match(/OPENAI_API_KEY=([^\n\r]+)/);
+    if (apiKeyMatch && apiKeyMatch[1]) {
+      OPENAI_API_KEY = apiKeyMatch[1].trim();
+      console.log('Successfully read API key directly from .env file');
+    }
+  } catch (error) {
+    console.error('Failed to read API key from .env file:', error);
+  }
+}
+
+if (!OPENAI_API_KEY) {
+  console.error('ERROR: OpenAI API key is missing! Make sure it\'s set in your .env file or in your Render.com environment variables.');
+  console.error('You may need to restart your server after updating the .env file.');
+  // Use a placeholder for development to avoid crashes
+  if (isDevelopment || isLocalhost) {
+    console.log('Using empty API key for development - this will not work with actual API calls');
+    OPENAI_API_KEY = 'sk-placeholder-for-development';
+  }
+}
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: OPENAI_API_KEY,
 });
 
 // Middleware
