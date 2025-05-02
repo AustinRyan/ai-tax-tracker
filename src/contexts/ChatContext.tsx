@@ -66,18 +66,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user || !isSupabaseAvailable) return;
       
       try {
+        // Always reset messages when user changes
+        setMessages([{
+          id: '1',
+          content: 'Hello! I\'m your AI tax assistant. How can I help you with your tax questions today?',
+          sender: 'ai',
+          timestamp: new Date(),
+          status: 'sent'
+        }]);
+        
         const history = await chatHistoryService.getChatHistory();
         
         if (history.length > 0) {
-          const formattedMessages: ChatMessage[] = history.map(msg => ({
-            id: msg.id,
-            content: msg.message,
-            sender: msg.sender as 'user' | 'ai',
-            timestamp: new Date(msg.timestamp),
-            status: 'sent'
-          }));
+          // Double check that all messages belong to the current user
+          const userMessages = history.filter(msg => msg.user_id === user.id);
           
-          setMessages(formattedMessages);
+          if (userMessages.length > 0) {
+            const formattedMessages: ChatMessage[] = userMessages.map(msg => ({
+              id: msg.id,
+              content: msg.message,
+              sender: msg.sender as 'user' | 'ai',
+              timestamp: new Date(msg.timestamp),
+              status: 'sent'
+            }));
+            
+            setMessages(formattedMessages);
+          }
         }
       } catch (err) {
         console.error('Error loading chat history:', err);

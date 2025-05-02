@@ -14,7 +14,26 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<LoginFormData>();
+  
+  // Check for demo login parameter in URL
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isDemo = urlParams.get('demo') === 'true';
+    
+    if (isDemo) {
+      // Auto-fill the demo credentials
+      setValue('email', 'test@gmail.com');
+      setValue('password', 'testtesttest');
+      
+      // Auto-submit the form with demo credentials after a short delay
+      const timer = setTimeout(() => {
+        onSubmit({ email: 'test@gmail.com', password: 'testtesttest' });
+      }, 500); // 500ms delay for smooth UX
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -26,7 +45,8 @@ const Login: React.FC = () => {
         throw error;
       }
       
-      navigate('/dashboard');
+      // Remove demo parameter from URL when redirecting
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to login. Please check your credentials.');
     } finally {
@@ -53,6 +73,38 @@ const Login: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {/* Demo Login Button */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => onSubmit({ email: 'test@gmail.com', password: 'testtesttest' })}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                'Demo Account Login'
+              )}
+            </button>
+            <p className="mt-2 text-xs text-center text-gray-500">
+              Click above to quickly access the demo with pre-filled credentials
+            </p>
+          </div>
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or sign in with email</span>
+            </div>
+          </div>
           {error && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
               <div className="flex">

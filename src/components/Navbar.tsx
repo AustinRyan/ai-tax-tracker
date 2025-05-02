@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Home, 
-  Receipt, 
-  FileText, 
-  MessageSquare, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  Home,
+  Receipt,
+  FileText,
+  MessageSquare,
+  Settings,
+  LogOut,
+  Menu,
   X,
   DollarSign,
   User
@@ -53,7 +53,7 @@ const Navbar: React.FC = () => {
       </div>
 
       {/* Sidebar for desktop */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+      <div className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-64">
         <div className="flex-1 flex flex-col min-h-0 bg-blue-700">
           <div className="flex items-center h-16 flex-shrink-0 px-4 bg-blue-800">
             <DollarSign className="h-8 w-8 text-white" />
@@ -99,7 +99,7 @@ const Navbar: React.FC = () => {
             </nav>
           </div>
           <div className="flex-shrink-0 flex border-t border-blue-800 p-4">
-            <div className="flex items-center">
+            <div className="flex items-center w-full">
               <div>
                 <div className="bg-blue-900 rounded-full h-9 w-9 flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
@@ -107,7 +107,7 @@ const Navbar: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <div className="ml-3">
+              <div className="ml-3 flex-1">
                 <p className="text-sm font-medium text-white">
                   {user?.user_metadata?.name || user?.email || 'User'}
                 </p>
@@ -208,10 +208,14 @@ const Navbar: React.FC = () => {
       )}
 
       {/* Main content */}
-      <div className="md:pl-64">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          {/* Content goes here */}
-        </div>
+      <div className="md:pl-64 flex flex-col flex-1">
+        <main className="flex-1">
+          <div className="py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+              {/* Content goes here */}
+            </div>
+          </div>
+        </main>
       </div>
     </>
   );

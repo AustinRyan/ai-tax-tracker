@@ -24,6 +24,18 @@ const LandingPage: React.FC = () => {
               <Link to="/login" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                 Login
               </Link>
+              {/* Demo Login Button */}
+              <Link 
+                to="/login" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  // Navigate to login page and immediately proceed with demo login
+                  window.location.href = '/login?demo=true';
+                }}
+                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+              >
+                Demo Login
+              </Link>
               <Link to="/register" className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
                 Sign Up
               </Link>
