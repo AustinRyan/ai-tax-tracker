@@ -13,6 +13,6 @@ export default defineConfig({
   },
   define: {
     // Make environment variables available to the client
-    'import.meta.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || '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'),
+    'import.meta.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
   },
 });

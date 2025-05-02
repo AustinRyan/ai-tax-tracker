@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Get the OpenAI API key from environment variables
-const OPENAI_API_KEY = import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY || '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';
+const OPENAI_API_KEY = import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
 
 // Create axios instance for OpenAI API
 const openaiApi = axios.create({
